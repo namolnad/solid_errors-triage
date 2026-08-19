@@ -1,0 +1,22 @@
+# Copy to config/solid_errors.yml in the host app. Every key is optional; the
+# defaults in SolidErrorsTriage::Configuration apply to anything left out.
+notification_triggers:
+  # State changes. "Resolved" closes the loop; "reopened" means the fix didn't
+  # hold, which is worth knowing immediately.
+  lifecycle:
+    resolved: true
+    reopened: true
+
+  # Occurrence milestones, roughly logarithmic: the 2nd occurrence tells you
+  # nothing the 1st didn't, but the 100th says this is now systemic.
+  counts:
+    - 1
+    - 10
+    - 100
+    - 1000
+
+  # Fires once as the window is crossed, not on every occurrence after it, so a
+  # loop erroring 10,000 times sends one email rather than 10,000.
+  rate_threshold:
+    count: 30
+    window: 300 # seconds
