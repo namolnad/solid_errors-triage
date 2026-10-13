@@ -42,23 +42,11 @@ module SolidErrorsTriage
       (@config.rate_threshold || {})[:window]
     end
 
-    def lifecycle_trigger(was_resolved:, resolved:)
-      return :reopened if was_resolved && !resolved && @config.notify_on_reopened?
-      return :resolved if !was_resolved && resolved && @config.notify_on_resolved?
-
-      nil
-    end
-
-    SUBJECTS = {
-      resolved: "✅ RESOLVED",
-      reopened: "🔄 REOPENED"
-    }.freeze
-
     # "3rd occurrence" and "resolved" are triaged very differently, and the
     # subject line is where that decision gets made.
     def subject_for(trigger:, exception_class:, severity_emoji: nil, occurrence_ordinal: nil)
       case trigger
-      when :resolved, :reopened then "#{SUBJECTS[trigger]}: #{exception_class}"
+      when :resolved then "✅ RESOLVED: #{exception_class}"
       when :milestone then "#{severity_emoji} #{exception_class} (#{occurrence_ordinal} occurrence)"
       when :rate then "#{severity_emoji} #{exception_class} (rate spike)"
       else "#{severity_emoji} #{exception_class}"

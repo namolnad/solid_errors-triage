@@ -3,10 +3,15 @@
 require "solid_errors_triage/version"
 require "solid_errors_triage/configuration"
 require "solid_errors_triage/policy"
-require "solid_errors_triage/railtie" if defined?(::Rails::Railtie)
+
+if defined?(::Rails::Engine)
+  require "solid_errors"
+  require "solid_errors_triage/engine"
+end
 
 module SolidErrorsTriage
-  autoload :Patches, "solid_errors_triage/patches"
+  autoload :Notifier, "solid_errors_triage/notifier"
+  autoload :NormalizingSubscriber, "solid_errors_triage/normalizing_subscriber"
   autoload :CleanupJob, "solid_errors_triage/cleanup_job"
 
   class << self

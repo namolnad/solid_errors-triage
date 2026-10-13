@@ -11,8 +11,7 @@ Gem::Specification.new do |spec|
   spec.summary       = "Notification triage and retention for Solid Errors"
   spec.description   = <<~DESC.strip
     Replaces Solid Errors' email-on-every-occurrence with milestone, rate and
-    lifecycle triggers, adds a nightly cleanup job for resolved errors, and
-    guards the error reporter against non-controller sources.
+    resolution emails, and adds a nightly cleanup job for resolved errors.
   DESC
   spec.homepage      = "https://github.com/namolnad/solid_errors-triage"
   spec.license       = "MIT"
@@ -21,9 +20,9 @@ Gem::Specification.new do |spec|
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
 
-  spec.files = Dir.glob("lib/**/*") + %w[LICENSE README.md]
+  spec.files = Dir.glob("{app,lib}/**/*") + %w[LICENSE README.md]
   spec.require_paths = [ "lib" ]
 
   spec.add_dependency "railties", ">= 7.1"
-  spec.add_dependency "solid_errors", ">= 0.5"
+  spec.add_dependency "solid_errors", ">= 0.8"
 end

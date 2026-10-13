@@ -6,13 +6,10 @@ class ConfigurationTest < TriageTestCase
   def test_sensible_defaults
     config = SolidErrorsTriage.config
 
-    assert_equal [ 1, 10, 100, 1_000 ], config.counts
+    # Solid Errors itself emails the first occurrence.
+    assert_equal [ 10, 100, 1_000 ], config.counts
     assert config.notify_on_resolved?
-    assert config.notify_on_reopened?
-    # Local exceptions are a firehose; storing them makes the errors page useless.
-    refute config.store_in_development?
-    # The cleanup job prunes nightly instead of inside the request that errored.
-    refute config.prune_inline?
+    assert_nil config.destroy_after
   end
 
   def test_loads_a_yaml_file
@@ -21,11 +18,11 @@ class ConfigurationTest < TriageTestCase
       notification_triggers:
         lifecycle:
           resolved: false
-          reopened: true
         counts: [2, 20]
         rate_threshold:
           count: 5
           window: 60
+      destroy_resolved_after_days: 90
     YAML
 
     SolidErrorsTriage.config.load_file(path)
@@ -33,14 +30,14 @@ class ConfigurationTest < TriageTestCase
     assert_equal [ 2, 20 ], SolidErrorsTriage.config.counts
     assert_equal({ count: 5, window: 60 }, SolidErrorsTriage.config.rate_threshold)
     refute SolidErrorsTriage.config.notify_on_resolved?
-    assert SolidErrorsTriage.config.notify_on_reopened?
+    assert_equal 90 * 86_400, SolidErrorsTriage.config.destroy_after
   ensure
     File.delete(path) if path && File.exist?(path)
   end
 
   def test_a_missing_file_leaves_the_defaults_alone
     SolidErrorsTriage.config.load_file("/nowhere/solid_errors.yml")
-    assert_equal [ 1, 10, 100, 1_000 ], SolidErrorsTriage.config.counts
+    assert_equal [ 10, 100, 1_000 ], SolidErrorsTriage.config.counts
   end
 
   # Fingerprinting on a message with a per-request id in it produces one "error"

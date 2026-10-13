@@ -18,22 +18,30 @@ or in an initializer.
 
 ## What it changes
 
-**Notification triggers.** Emails fire on occurrence milestones (1st, 10th, 100th,
-1000th — roughly logarithmic, because the 2nd occurrence tells you nothing the 1st
-didn't but the 100th says this is systemic), on a rate spike, and on resolve /
-reopen. The rate rule fires *once* as the window is crossed rather than on every
-occurrence after it, so a loop erroring 10,000 times sends one email.
+**Notification triggers.** The gem switches off Solid Errors'
+`email_every_occurrence` (unless the app sets it), which leaves Solid Errors
+emailing an error's first occurrence and the occurrence that reopens it. On top of
+that, from the `occurrence_created.solid_errors` and `error_resolved.solid_errors`
+events, it emails on occurrence milestones (10th, 100th, 1000th — roughly
+logarithmic, because the 2nd occurrence tells you nothing the 1st didn't but the
+100th says this is systemic), on a rate spike, and on resolve. The rate rule fires
+*once* as the window is crossed rather than on every occurrence after it, so a
+loop erroring 10,000 times sends one email.
 
-**A source guard.** Rails sometimes reports errors with a String source (for
-example `"application.action_dispatch"`), and the gem assumes a controller and
-calls `action_name` on it. That raises inside the error reporter, which is the
-worst possible place for an exception.
+Nothing in Solid Errors is patched: the extra emails go through a subclass of its
+mailer, reusing its templates, with a subject that says which rule fired.
 
 **Retention.** `SolidErrorsTriage::CleanupJob` prunes old *resolved* errors
 nightly. Unresolved ones are never deleted at any age — an error nobody has looked
 at is not an error nobody needs, and dropping it would make the errors page lie
-about what is outstanding. Inline pruning is switched off, because doing it in two
-places lands a multi-table delete inside the request that just errored.
+about what is outstanding. Set the retention here rather than with Solid Errors'
+own `destroy_after`, which prunes inline and so lands a multi-table delete inside
+the request that just errored.
+
+```yaml
+# config/solid_errors.yml
+destroy_resolved_after_days: 90
+```
 
 ```yaml
 # config/recurring.yml
@@ -42,9 +50,14 @@ cleanup_solid_errors:
   schedule: every day at 2am
 ```
 
-**Development logs instead of storing.** Local exceptions are a firehose — every
-typo in a view — and persisting them makes the errors page useless for the thing
-it's for. Set `store_in_development = true` to exercise the page against real data.
+**Development.** Local exceptions are a firehose — every typo in a view — and
+persisting them makes the errors page useless for the thing it's for. Solid Errors
+can now be switched off per environment:
+
+```ruby
+# config/environments/development.rb
+config.solid_errors.enabled = false
+```
 
 ## Fingerprint normalizers
 
@@ -68,6 +81,9 @@ SolidErrorsTriage.configure do |config|
 end
 ```
 
+Registering a normalizer swaps Solid Errors' error subscriber for one that runs
+the normalizers first and then hands the error on.
+
 The id ends up in the occurrence context — still there to quote in a support
 ticket — and out of the string the fingerprint is computed from.
 
@@ -75,17 +91,15 @@ ticket — and out of the string the fingerprint is computed from.
 
 ```ruby
 SolidErrorsTriage.configure do |config|
-  config.counts = [ 1, 10, 100, 1_000 ]
+  config.counts = [ 10, 100, 1_000 ]
   config.rate_threshold = { count: 30, window: 300 }  # seconds
   config.notify_on_resolved = true
-  config.notify_on_reopened = true
-  config.store_in_development = false
-  config.prune_inline = false
+  config.destroy_after = 90.days                      # read by CleanupJob
 end
 ```
 
-Configuration Solid Errors itself reads earlier — `connects_to`, `destroy_after`,
-`base_controller_class` — still belongs in `config/application.rb`, because the
+Configuration Solid Errors itself reads earlier — `connects_to`,
+`base_controller_class`, `enabled`, `email_every_occurrence` — still belongs in `config/application.rb`, because the
 engine reads it from its own initializer, which runs before `config/initializers/*`.
 
 ## A consequence worth knowing

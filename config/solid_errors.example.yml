@@ -1,16 +1,16 @@
 # Copy to config/solid_errors.yml in the host app. Every key is optional; the
 # defaults in SolidErrorsTriage::Configuration apply to anything left out.
+#
+# Solid Errors itself emails an error's first occurrence, and the occurrence that
+# reopens it. These are the rules for every email after that.
 notification_triggers:
-  # State changes. "Resolved" closes the loop; "reopened" means the fix didn't
-  # hold, which is worth knowing immediately.
+  # "Resolved" closes the loop.
   lifecycle:
     resolved: true
-    reopened: true
 
   # Occurrence milestones, roughly logarithmic: the 2nd occurrence tells you
   # nothing the 1st didn't, but the 100th says this is now systemic.
   counts:
-    - 1
     - 10
     - 100
     - 1000
@@ -20,3 +20,7 @@ notification_triggers:
   rate_threshold:
     count: 30
     window: 300 # seconds
+
+# How long a resolved error is kept before SolidErrorsTriage::CleanupJob prunes
+# it. Unset, the job does nothing.
+destroy_resolved_after_days: 90
