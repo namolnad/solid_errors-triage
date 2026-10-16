@@ -20,9 +20,9 @@ Gem::Specification.new do |spec|
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = spec.homepage
 
-  spec.files = Dir.glob("{app,lib}/**/*") + %w[LICENSE README.md]
+  spec.files = Dir.glob("lib/**/*") + %w[LICENSE README.md]
   spec.require_paths = [ "lib" ]
 
   spec.add_dependency "railties", ">= 7.1"
-  spec.add_dependency "solid_errors", ">= 0.8"
+  spec.add_dependency "solid_errors", ">= 0.9"
 end

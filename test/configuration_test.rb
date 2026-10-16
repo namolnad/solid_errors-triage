@@ -10,6 +10,9 @@ class ConfigurationTest < TriageTestCase
     assert_equal [ 10, 100, 1_000 ], config.counts
     assert config.notify_on_resolved?
     assert_nil config.destroy_after
+    assert config.withhold_job_arguments
+    assert config.withhold_request_params
+    assert_equal 3_600, config.rate_quiet
   end
 
   def test_loads_a_yaml_file
@@ -23,6 +26,7 @@ class ConfigurationTest < TriageTestCase
           count: 5
           window: 60
       destroy_resolved_after_days: 90
+      withhold_job_arguments: false
     YAML
 
     SolidErrorsTriage.config.load_file(path)
@@ -31,6 +35,8 @@ class ConfigurationTest < TriageTestCase
     assert_equal({ count: 5, window: 60 }, SolidErrorsTriage.config.rate_threshold)
     refute SolidErrorsTriage.config.notify_on_resolved?
     assert_equal 90 * 86_400, SolidErrorsTriage.config.destroy_after
+    refute SolidErrorsTriage.config.withhold_job_arguments
+    assert SolidErrorsTriage.config.withhold_request_params
   ensure
     File.delete(path) if path && File.exist?(path)
   end

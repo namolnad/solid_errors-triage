@@ -3,8 +3,8 @@
 require "rails/engine"
 
 module SolidErrorsTriage
-  # An engine rather than a railtie so the mailer under app/ is autoloaded, and
-  # reloaded alongside the Solid Errors mailer it subclasses.
+  # Hooks into the app's boot, some of it before Solid Errors reads its own
+  # configuration.
   class Engine < ::Rails::Engine
     config.solid_errors_triage = ActiveSupport::OrderedOptions.new
     config.solid_errors_triage.config_path = "config/solid_errors.yml"
@@ -16,6 +16,10 @@ module SolidErrorsTriage
       unless app.config.solid_errors.key?(:email_every_occurrence)
         app.config.solid_errors.email_every_occurrence = false
       end
+      # Named inside the lambda, so a reconfigured policy is the one asked.
+      unless app.config.solid_errors.key?(:email_subject)
+        app.config.solid_errors.email_subject = ->(**args) { SolidErrorsTriage.subject(**args) }
+      end
     end
 
     initializer "solid_errors_triage.configure" do |app|
@@ -24,6 +28,13 @@ module SolidErrorsTriage
 
     initializer "solid_errors_triage.notifications" do
       SolidErrorsTriage::Notifier.subscribe!
+    end
+
+    # Every job and every controller, the framework's own included: a mail
+    # delivery job's arguments are the mail.
+    initializer "solid_errors_triage.withhold" do
+      ActiveSupport.on_load(:active_job) { before_perform { SolidErrorsTriage.withhold_job_arguments! } }
+      ActiveSupport.on_load(:action_controller) { before_action { SolidErrorsTriage.withhold_request_params! } }
     end
 
     initializer "solid_errors_triage.job" do

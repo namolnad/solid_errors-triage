@@ -24,12 +24,32 @@ emailing an error's first occurrence and the occurrence that reopens it. On top 
 that, from the `occurrence_created.solid_errors` and `error_resolved.solid_errors`
 events, it emails on occurrence milestones (10th, 100th, 1000th — roughly
 logarithmic, because the 2nd occurrence tells you nothing the 1st didn't but the
-100th says this is systemic), on a rate spike, and on resolve. The rate rule fires
-*once* as the window is crossed rather than on every occurrence after it, so a
-loop erroring 10,000 times sends one email.
+100th says this is systemic), on a rate spike, and on resolve. A milestone is
+counted up to the occurrence in hand, so two committed together cannot both skip
+it. A rate spike emails once per error per quiet period (an hour by default),
+however long it lasts, so a loop erroring 10,000 times sends one email. The quiet
+period is kept in `Rails.cache`, or in the process when the cache is a `NullStore`.
 
-Nothing in Solid Errors is patched: the extra emails go through a subclass of its
-mailer, reusing its templates, with a subject that says which rule fired.
+Nothing in Solid Errors is patched. The extra emails go through Solid Errors' own
+mailer with a reason, and the gem sets Solid Errors' `email_subject` (unless the
+app sets one) so every subject says which rule fired: `(reopened)`,
+`(10th occurrence)`, `(rate spike)`, `✅ RESOLVED:`. Requires Solid Errors 0.9.
+
+**Job inputs and request params are withheld.** Solid Errors 0.9 keeps a failing
+job's arguments and a failing request's params with the error, and mails them,
+filtered only by `filter_parameters`. A message, a mail body or a person's details
+passed under an ordinary name, or positionally, goes straight through — and every
+mail delivery job's arguments are the mail. So the gem puts `[withheld]` in their
+place for every job and controller, the framework's own included. The job class,
+id and queue and the controller and action are kept. An app whose inputs are only
+ids can turn either back on:
+
+```ruby
+SolidErrorsTriage.configure do |config|
+  config.withhold_job_arguments = false
+  config.withhold_request_params = false
+end
+```
 
 **Retention.** `SolidErrorsTriage::CleanupJob` prunes old *resolved* errors
 nightly. Unresolved ones are never deleted at any age — an error nobody has looked
@@ -92,9 +112,11 @@ ticket — and out of the string the fingerprint is computed from.
 ```ruby
 SolidErrorsTriage.configure do |config|
   config.counts = [ 10, 100, 1_000 ]
-  config.rate_threshold = { count: 30, window: 300 }  # seconds
+  config.rate_threshold = { count: 30, window: 300, quiet: 3_600 }  # seconds
   config.notify_on_resolved = true
   config.destroy_after = 90.days                      # read by CleanupJob
+  config.withhold_job_arguments = true
+  config.withhold_request_params = true
 end
 ```
 

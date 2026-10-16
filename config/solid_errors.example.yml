@@ -15,12 +15,18 @@ notification_triggers:
     - 100
     - 1000
 
-  # Fires once as the window is crossed, not on every occurrence after it, so a
+  # One email per error per quiet period, however long the spike lasts, so a
   # loop erroring 10,000 times sends one email rather than 10,000.
   rate_threshold:
     count: 30
     window: 300 # seconds
+    quiet: 3600 # seconds
 
 # How long a resolved error is kept before SolidErrorsTriage::CleanupJob prunes
 # it. Unset, the job does nothing.
 destroy_resolved_after_days: 90
+
+# Job arguments and request params are kept out of errors and their emails.
+# Turn either back on only where every input is an id.
+withhold_job_arguments: true
+withhold_request_params: true
