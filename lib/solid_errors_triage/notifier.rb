@@ -3,7 +3,8 @@
 module SolidErrorsTriage
   # Sends the emails Solid Errors does not: occurrence milestones, rate spikes and
   # resolutions. Driven by the events Solid Errors publishes once each change is
-  # committed.
+  # committed, and sent through Solid Errors' own mailer with a reason, which
+  # SolidErrorsTriage.subject turns into the subject line.
   module Notifier
     def self.subscribe!
       ActiveSupport::Notifications.subscribe("occurrence_created.solid_errors") do |event|
@@ -23,13 +24,15 @@ module SolidErrorsTriage
       return if occurrence.opens_error
 
       error = occurrence.error
+      # Counted up to this occurrence rather than in total: this runs after
+      # commit, so two occurrences committed together would both count both and
+      # neither would land on the milestone between them.
+      up_to_here = error.occurrences.where(id: ..occurrence.id)
       window = policy.rate_window
-      recent = window ? error.occurrences.where(created_at: window.seconds.ago..).count : 0
+      recent = window ? up_to_here.where(created_at: (occurrence.created_at - window)..).count : 0
 
-      trigger = policy.trigger_for(
-        occurrence_count: error.occurrences.count,
-        recent_count: recent
-      )
+      trigger = policy.trigger_for(rank: up_to_here.count, recent_count: recent)
+      trigger = nil if trigger == :rate && !RateGate.claim(error.id, quiet: SolidErrorsTriage.config.rate_quiet)
       deliver(occurrence, trigger) if trigger
     end
 
@@ -38,7 +41,7 @@ module SolidErrorsTriage
 
       # The mail template renders an occurrence, so an error pruned down to none
       # has nothing to show.
-      occurrence = error.occurrences.order(:created_at).last
+      occurrence = error.occurrences.order(:id).last
       deliver(occurrence, :resolved) if occurrence
     end
 
@@ -46,8 +49,8 @@ module SolidErrorsTriage
     # worth knowing: error mail rides the queue, so an outage that takes the queue
     # down also takes down the mail telling you about it. The errors are still
     # recorded and the /errors page reads the database directly.
-    def self.deliver(occurrence, trigger)
-      SolidErrorsTriage::ErrorMailer.triaged(occurrence, trigger: trigger).deliver_later
+    def self.deliver(occurrence, reason)
+      SolidErrors::ErrorMailer.error_occurred(occurrence, reason).deliver_later
     end
 
     def self.policy = SolidErrorsTriage.policy
